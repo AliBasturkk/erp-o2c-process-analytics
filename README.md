@@ -1,55 +1,78 @@
-# 🔄 ERP Order-to-Cash (O2C) Process Mining & Bottleneck Analytics
+# 🔄 ERP Order-to-Cash (O2C) Süreç & Darboğaz Analitiği
 
-Kurumsal satış operasyonlarında (Order-to-Cash) departmanlar arası operasyonel darboğazları, SLA (Hizmet Seviyesi Taahhüdü) ihlallerini ve nakit akışını riske atan gecikmiş tahsilatları analiz etmek amacıyla geliştirilmiş süreç analitiği ve iş zekası çalışması.
-
-![Dashboard Preview](docs/dashboard_preview.png)
+Uçtan uca kurumsal satış operasyonlarında (Order-to-Cash) departmanlar arası operasyonel darboğazları, SLA (Hizmet Seviyesi Taahhüdü) ihlallerini ve nakit akışını riske atan gecikmiş tahsilatları tespit etmek amacıyla geliştirilmiş bir Süreç Analitiği ve İş Zekası çalışmasıdır.
 
 ---
 
-## 📌 Proje Özeti ve İş Problemi
+## 📌 Proje Kapsamı ve İş Problemi
 
-Order-to-Cash (O2C); bir müşterinin sipariş vermesinden siparişin onaylanmasına, depodan toplanmasına, sevk edilmesine, faturalandırılmasına ve nihai nakit tahsilatına kadar uzanan uçtan uca satış operasyonudur.
+Order-to-Cash (O2C); müşterinin siparişi vermesinden başlayarak finans onayı, depo hazırlığı, lojistik sevkiyat, faturalama ve nihai nakit tahsilatına kadar uzanan tüm satış döngüsünü kapsar. 
 
-Bu süreçteki departmanlar arası koordinasyon eksiklikleri ve onay kuyrukları:
-* **Müşteri Memnuniyetsizliğine:** Sipariş teslim sürelerinin (Lead Time) kontrolsüz uzamasına,
-* **Sermaye Tutsaklığına:** Faturaların gecikmesi veya vadesi geçen alacakların (Overdue Receivables) birikmesiyle nakit akışının bozulmasına neden olur.
+Kurumsal operasyonlarda departmanlar arası bilgi kopukluğu ve manuel onay mekanizmaları şu kritik iş problemlerine yol açar:
+* **Müşteri Memnuniyetsizliği:** Sipariş teslimat sürelerinin (Lead Time) kontrolsüz uzaması ve SLA ihlalleri.
+* **Tutsak Sermaye (Working Capital Tıkanıklığı):** Geciken faturalar veya vadesi geçmiş tahsilatlar sebebiyle şirket nakit döngüsünün kilitlenmesi.
 
-Bu projenin amacı, kurumsal ERP işlem kayıtları üzerinden aşama bazlı darboğazları tespit etmek, departmanların SLA ihlal oranlarını ölçmek ve yönetime aksiyon odaklı analitik içgörüler sunmaktır.
+Bu çalışmada, ERP işlem kayıtları üzerinden her aşamanın döngü süresi (Cycle Time) analiz edilmiş, darboğaza neden olan departmanlar ayrıştırılmış ve kök neden analizine dayalı süreç iyileştirme önerileri geliştirilmiştir.
 
 ---
 
-## ⚙️ BPMN 2.0 Süreç Mimarisi
+## 🎯 Operasyonel Aşamalar ve SLA Hedefleri
 
-Aşağıdaki akış şeması, analiz edilen 5 operasyonel kulvarı (Swimlane), karar kapılarını ve her aşama için tanımlanan resmi SLA hedeflerini göstermektedir:
+Süreç, 5 temel aşama ve her aşama için tanımlanan resmi hizmet seviyesi taahhütleri (SLA) üzerinden izlenmektedir:
 
-```mermaid
-flowchart TD
-    Start([Müşteri Siparişi Girişi]) --> Step1[1. Satış: ERP Sipariş Kaydı]
-    
-    subgraph Finans_Kulvari [Finans Departmanı - SLA: 24 Saat]
-        Step1 --> Gateway1{Kredi Limiti Yeterli mi?}
-        Gateway1 -- Hayır --> Cancel[Sipariş Donduruldu / İptal]
-        Gateway1 -- Evet --> Step2[Kredi Onayı Verildi]
-    end
+| Süreç Aşaması | Sorumlu Birim | İzlenen Milat Taşı | Hedef SLA |
+| :--- | :--- | :--- | :--- |
+| **Kredi Onayı** | Finans | Sipariş Girişi $\rightarrow$ Kredi Onayı | $\le$ 24 Saat |
+| **Depo Toplama** | Depo / WMS | Kredi Onayı $\rightarrow$ Toplama & Paketleme | $\le$ 48 Saat |
+| **Sevkiyat** | Lojistik / 3PL | Paketleme $\rightarrow$ Taşıyıcı Teslimatı | $\le$ 72 Saat |
+| **Faturalama** | Muhasebe | Teslimat $\rightarrow$ e-Fatura Kesimi | $\le$ 24 Saat |
+| **Tahsilat** | Finans / Tahsilat | Fatura Tarihi $\rightarrow$ Banka Girişi | Sözleşme Vadesi (Net 15 - 60 Gün) |
 
-    subgraph Depo_Kulvari [Depo Operasyonu - SLA: 48 Saat]
-        Step2 --> Step3[WMS Toplama ve Paketleme]
-    end
+---
 
-    subgraph Lojistik_Kulvari [Lojistik / 3PL - SLA: 72 Saat]
-        Step3 --> Step4[Taşıyıcıya Teslim & Sevkiyat]
-        Step4 --> Step5[Müşteriye Teslimat - POD]
-    end
+## 🔍 Temel Bulgular ve Kök Neden Analizi (Root Cause Analysis)
 
-    subgraph Muhasebe_Kulvari [Muhasebe & Finans - SLA: 24 Saat / Sözleşme Vadesi]
-        Step5 --> Step6[e-Fatura Düzenlendi]
-        Step6 --> Step7{Vade İçinde Tahsilat Sağlandı mı?}
-        Step7 -- Evet --> EndSuccess([Tahsilat Kapatıldı - Süreç Başarılı])
-        Step7 -- Hayır --> Alert[Vade Aşımı Uyarısı & Hukuki Takip]
-    end
+İncelenen operasyonel veriler sonucunda sistemde tespit edilen kritik darboğazlar ve aksiyon planları:
 
-    classDef default fill:#f8fafc,stroke:#334155,stroke-width:1px;
-    classDef alert fill:#fee2e2,stroke:#ef4444,stroke-width:2px;
-    classDef success fill:#dcfce7,stroke:#16a34a,stroke-width:2px;
-    class Cancel,Alert alert;
-    class EndSuccess success;
+1. **Finans Departmanı (Kredi Onay Kuyruğu):**
+   * **Bulgu:** Onay süresi 100 saate kadar çıkarak 24 saatlik SLA hedefini 4 kat aşmıştır.
+   * **Kök Neden:** Kredi limiti sınırındaki işlemlerin manuel komite onayı beklemesi.
+   * **Öneri:** ERP üzerinde kural tabanlı otomatik onay (Auto-Credit Approval) mimarisi kurulmalı; risk skoru düşük cariler doğrudan depoya aktarılmalıdır.
+
+2. **Depo Operasyonları (Toplama & Paketleme):**
+   * **Bulgu:** Depo hazırlık süresi 148 saate ulaşarak en yüksek iç operasyonel gecikmeyi yaratmıştır.
+   * **Kök Neden:** Fiziksel stok ile sistem stoğu arasındaki tutarsızlıklar ve rafta ürün arama süreleri.
+   * **Öneri:** WMS tarafında RF el terminalleriyle dinamik toplama rotalama sistemine geçilmeli ve sipariş anında hard-allocation (kesin rezervasyon) zorunlu tutulmalıdır.
+
+3. **Lojistik & Nakliye:**
+   * **Bulgu:** Sevkiyat süresi 171 saate ulaşarak taahhüt edilen 72 saatlik eşiği aşmıştır.
+   * **Kök Neden:** 3PL taşeron taşıyıcıların dönemsel kapasite ve transit süre taahhütlerini yerine getirememesi.
+   * **Öneri:** Taşıyıcı sözleşmelerine SLA gecikme cezaları (Penalty Clause) eklenmeli ve dinamik taşıyıcı performans puanlama panosu işletilmelidir.
+
+4. **Nakit Akışı ve Tahsilat Sapması:**
+   * **Bulgu:** Sipariş 3.2 gün gibi hızlı bir sürede müşteriye teslim edilmiş olmasına karşın, 45 günlük vadeye rağmen ödeme 83 günde tahsil edilmiştir (+38 gün vade sapması).
+   * **Finansal Etki:** 140.000 TL şirket işletme sermayesi müşteride rehin kalarak nakit akışını baskılamıştır.
+   * **Öneri:** Fatura vadesi öncesinde otomatik hatırlatma (Dunning) süreçleri işletilmeli, vadesi geçen carilere ERP düzeyinde yeni sipariş blokajı uygulanmalıdır.
+
+---
+
+## 🛠️ Kullanılan Teknolojiler
+
+* **Veritabanı & Analitik:** Microsoft SQL Server (T-SQL)
+* **İş Zekası & Raporlama:** Microsoft Power BI (DAX Modellemesi)
+* **Metodoloji:** Süreç Madenciliği (Process Mining), SLA Performans Yönetimi, Kök Neden Analizi
+
+---
+
+## 📂 Depo Dizin Yapısı
+
+```text
+erp-o2c-process-analytics/
+├── docs/
+│   └── dashboard_preview.png       # Rapor görsel arşivi
+├── power_bi/
+│   └── o2c_control_tower.pbix      # Power BI veri modeli ve interaktif pano
+├── sql/
+│   ├── sla_01.sql                  # Aşama döngü süreleri ve SLA ihlal sorgusu
+│   └── sla_02.sql                  # Departman bazlı özet metrik sorgusu
+└── README.md                       # Proje dokümantasyonu
